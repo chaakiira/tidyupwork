@@ -11,7 +11,7 @@ body{font-family:微软雅黑,sans-serif;background:var(--bg);color:var(--text);
 .container{max-width:500px;margin:0 auto}
 .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .header h1{font-size:20px}
-.btn{padding:8px 12px;border-radius:10px;background:var(--btn);color:white;text-decoration:none;font-size:14px}
+.btn{padding:8px 12px;border-radius:10px;background:var(--btn);color:white;border:0;text-decoration:none;font-size:14px}
 .search-box{margin-bottom:12px}
 .search-box input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card);font-size:16px}
 .card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
@@ -21,113 +21,127 @@ body{font-family:微软雅黑,sans-serif;background:var(--bg);color:var(--text);
 .link-name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .link-author{font-size:13px;color:#888}
 .link-item a{color:var(--btn);text-decoration:none}
-.del{font-size:14px;padding:4px 6px;color:var(--del)}
+.edit,.move,.del{font-size:14px;padding:4px 6px}
+.edit{color:#007bff}
+.move{color:#ff9500}
+.del{color:var(--del)}
 .hidden{display:none}
-.loading{text-align:center;padding:20px}
+.loading{text-align:center;padding:20px;color:#666}
 </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
     <h1>🔗 共享链接网盘</h1>
-    <div style="display:flex;gap:8px">
-      <button class="btn" onclick="location.reload()">🔄 刷新</button>
-      <a class="btn" href="add.html">➕ 添加链接</a>
-    </div>
+    <a class="btn" href="add.html">➕ 添加/新建文件夹</a>
   </div>
   <div class="search-box">
     <input type="text" id="search" placeholder="🔍 搜索标题/作者" oninput="search()">
   </div>
-  <div id="loading" class="loading">加载中...</div>
+  <div id="loading" class="loading">云端加载中...</div>
   <div id="list"></div>
 </div>
 
 <script>
+// 已帮你填好固定信息
 const GITHUB_USER = "chaakiira";
 const GITHUB_REPO = "tidyupwork";
-const GITHUB_TOKEN = "把你自己的token粘贴在这里";
+// 👉 这里粘贴你自己的 ghp_ 开头Token
+const GITHUB_TOKEN = "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";
 const FILE_PATH = "data.json";
+
 let data = { folders: [], links: [] };
 
-async function loadData() {
-  try {
+// 读取云端 + 修复中文乱码
+async function loadData(){
+  try{
     const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
-    if (!res.ok) throw new Error("file not found");
     const json = await res.json();
-    const content = decodeURIComponent(escape(atob(json.content)));
-    data = JSON.parse(content);
+    const raw = atob(json.content);
+    data = JSON.parse(decodeURIComponent(escape(raw)));
     render();
-    document.getElementById("loading").style.display = "none";
-  } catch (e) {
-    data = { folders: [{ id: 1, name: "默认文件夹" }], links: [] };
-    await saveData("init data");
+    document.getElementById("loading").style.display="none";
+  }catch(e){
+    // 初始化默认文件夹
+    data = {
+      folders: [{id:1,name:"默认文件夹"}],
+      links:[]
+    };
+    await saveData("初始化文件夹");
     render();
-    document.getElementById("loading").style.display = "none";
+    document.getElementById("loading").style.display="none";
   }
 }
 
-async function saveData(message = "update") {
-  try {
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
-    let sha;
-    if (res.ok) {
-      const json = await res.json();
-      sha = json.sha;
-    }
-    const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
-    const body = { message, content };
-    if (sha) body.sha = sha;
-
-    await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`, {
-      method: "PUT",
-      headers: {
-        "Authorization": `token ${GITHUB_TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(body)
-    });
-  } catch (e) {
-    alert("保存失败：" + e.message);
+// 保存到云端
+async function saveData(msg="更新数据"){
+  const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
+  let sha = "";
+  if(res.ok){
+    const j = await res.json();
+    sha = j.sha;
   }
+  const str = JSON.stringify(data,null,2);
+  const encodeStr = unescape(encodeURIComponent(str));
+  const content = btoa(encodeStr);
+
+  await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`,{
+    method:"PUT",
+    headers:{
+      "Authorization":"token "+GITHUB_TOKEN,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      message:msg,
+      content:content,
+      sha:sha
+    })
+  });
 }
 
-function render() {
+// 删除链接
+async function delLink(id){
+  if(!confirm("确定删除？"))return;
+  data.links = data.links.filter(item=>item.id!=id);
+  await saveData("删除链接");
+  render();
+}
+
+// 搜索
+function search(){
+  let kw = document.getElementById("search").value.toLowerCase();
+  document.querySelectorAll(".link-item").forEach(el=>{
+    let t = (el.dataset.name+" "+el.dataset.author).toLowerCase();
+    el.classList.toggle("hidden",kw && !t.includes(kw));
+  });
+}
+
+// 渲染页面
+function render(){
   const list = document.getElementById("list");
   list.innerHTML = "";
-  data.folders.forEach(f => {
-    const card = document.createElement("div");
+  data.folders.forEach(f=>{
+    let card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `<div class="folder">📁 ${f.name}</div>`;
-    const items = data.links.filter(l => l.fid === f.id);
-    items.forEach(l => {
+    let arr = data.links.filter(l=>l.fid===f.id);
+    arr.forEach(l=>{
       card.innerHTML += `
       <div class="link-item" data-name="${l.name}" data-author="${l.author||''}">
         <div class="link-info">
           <div class="link-name"><a href="${l.url}" target="_blank">${l.name}</a></div>
-          ${l.author ? `<div class="link-author">作者：${l.author}</div>` : ""}
+          ${l.author?`<div class="link-author">作者：${l.author}</div>`:""}
         </div>
-        <span class="del" onclick="delLink('${l.id}')">删除</span>
-      </div>`;
+        <span class="del" onclick="delLink(${l.id})">删除</span>
+      </div>
+      `;
     });
     list.appendChild(card);
   });
+  search();
 }
 
-function search() {
-  const kw = document.getElementById("search").value.toLowerCase();
-  document.querySelectorAll(".link-item").forEach(i => {
-    const t = (i.dataset.name + " " + i.dataset.author).toLowerCase();
-    i.classList.toggle("hidden", kw && !t.includes(kw));
-  });
-}
-
-async function delLink(id) {
-  if (!confirm("确定删除？")) return;
-  data.links = data.links.filter(l => l.id !== id);
-  await saveData("delete");
-  render();
-}
-
+// 启动
 loadData();
 </script>
 </body>
