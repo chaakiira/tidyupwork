@@ -21,9 +21,7 @@ body{font-family:微软雅黑,sans-serif;background:var(--bg);color:var(--text);
 .link-name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .link-author{font-size:13px;color:#888}
 .link-item a{color:var(--btn);text-decoration:none}
-.edit,.move,.del{font-size:14px;padding:4px 6px}
-.edit{color:#007bff}
-.del{color:var(--del)}
+.del{font-size:14px;padding:4px 6px;color:var(--del)}
 .hidden{display:none}
 .loading{text-align:center;padding:20px}
 </style>
@@ -32,7 +30,10 @@ body{font-family:微软雅黑,sans-serif;background:var(--bg);color:var(--text);
 <div class="container">
   <div class="header">
     <h1>🔗 共享链接网盘</h1>
-    <a class="btn" href="add.html">➕ 添加链接</a>
+    <div style="display:flex;gap:8px">
+      <button class="btn" onclick="location.reload()">🔄 刷新</button>
+      <a class="btn" href="add.html">➕ 添加链接</a>
+    </div>
   </div>
   <div class="search-box">
     <input type="text" id="search" placeholder="🔍 搜索标题/作者" oninput="search()">
@@ -42,45 +43,52 @@ body{font-family:微软雅黑,sans-serif;background:var(--bg);color:var(--text);
 </div>
 
 <script>
-// ========== 你只需要改这里 ==========
 const GITHUB_USER = "chaakiira";
 const GITHUB_REPO = "tidyupwork";
-const GITHUB_TOKEN = "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";
-// ==================================
-
+const GITHUB_TOKEN = "把你自己的token粘贴在这里";
 const FILE_PATH = "data.json";
 let data = { folders: [], links: [] };
 
 async function loadData() {
   try {
     const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
+    if (!res.ok) throw new Error("file not found");
     const json = await res.json();
-    const content = atob(json.content);
+    const content = decodeURIComponent(escape(atob(json.content)));
     data = JSON.parse(content);
     render();
     document.getElementById("loading").style.display = "none";
   } catch (e) {
     data = { folders: [{ id: 1, name: "默认文件夹" }], links: [] };
-    await saveData();
+    await saveData("init data");
     render();
     document.getElementById("loading").style.display = "none";
   }
 }
 
-async function saveData() {
-  const content = btoa(JSON.stringify(data, null, 2));
-  const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`, {
-    method: "PUT",
-    headers: {
-      "Authorization": `token ${GITHUB_TOKEN}`,
-      "Accept": "application/vnd.github.v3+json"
-    },
-    body: JSON.stringify({
-      message: "更新数据",
-      content: content
-    })
-  });
-  return res.ok;
+async function saveData(message = "update") {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
+    let sha;
+    if (res.ok) {
+      const json = await res.json();
+      sha = json.sha;
+    }
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+    const body = { message, content };
+    if (sha) body.sha = sha;
+
+    await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`, {
+      method: "PUT",
+      headers: {
+        "Authorization": `token ${GITHUB_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+  } catch (e) {
+    alert("保存失败：" + e.message);
+  }
 }
 
 function render() {
@@ -96,7 +104,7 @@ function render() {
       <div class="link-item" data-name="${l.name}" data-author="${l.author||''}">
         <div class="link-info">
           <div class="link-name"><a href="${l.url}" target="_blank">${l.name}</a></div>
-          ${l.author ? `<div class="link-author">${l.author}</div>` : ""}
+          ${l.author ? `<div class="link-author">作者：${l.author}</div>` : ""}
         </div>
         <span class="del" onclick="delLink('${l.id}')">删除</span>
       </div>`;
@@ -111,16 +119,12 @@ function search() {
     const t = (i.dataset.name + " " + i.dataset.author).toLowerCase();
     i.classList.toggle("hidden", kw && !t.includes(kw));
   });
-  document.querySelectorAll(".card").forEach(c => {
-    const has = c.querySelector(".link-item:not(.hidden)");
-    c.classList.toggle("hidden", !has);
-  });
 }
 
 async function delLink(id) {
   if (!confirm("确定删除？")) return;
   data.links = data.links.filter(l => l.id !== id);
-  await saveData();
+  await saveData("delete");
   render();
 }
 
