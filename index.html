@@ -6,10 +6,7 @@
 <title>链接网盘</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#f2f5f9;--card:#fff;--text:#333;--border:#e3e7ed;
-  --btn:#007bff;--del:#ff3b30;--folder:#f8f9fa
-}
+:root{--bg:#f2f5f9;--card:#fff;--text:#333;--border:#e3e7ed;--btn:#007bff;--del:#ff3b30;--folder:#f8f9fa}
 body{font-family:微软雅黑,sans-serif;background:var(--bg);color:var(--text);padding:12px}
 .container{max-width:500px;margin:0 auto}
 .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
@@ -32,103 +29,93 @@ body{font-family:微软雅黑,sans-serif;background:var(--bg);color:var(--text);
 .del{color:var(--del)}
 .handle{cursor:move;color:#999;padding:0 4px}
 .hidden{display:none}
-.loading{text-align:center;padding:20px;color:#666}
+.loading{text-align:center;padding:20px}
 </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
-    <h1>🔗 共享网盘</h1>
+    <h1>🔗 链接网盘</h1>
     <a class="btn" href="add.html">➕ 添加/新建文件夹</a>
   </div>
   <div class="search-box">
-    <input type="text" id="search" placeholder="🔍 搜索标题/作者/章节" oninput="render()">
+    <input type="text" id="search" placeholder="🔍 搜索..." oninput="render()">
   </div>
   <div id="loading" class="loading">加载中...</div>
   <div id="list"></div>
 </div>
 
 <script>
-const USER = "chaakiira";
-const REPO = "tidyupwork";
-let data = { folders: [{id:1,name:"默认文件夹"}], links:[] };
+const STORAGE_KEY = "my_links_data";
+let data = { folders: [{ id: 1, name: "默认文件夹" }], links: [] };
 
-async function loadData(){
-  try{
-    const res = await fetch(`https://cdn.jsdelivr.net/gh/${USER}/${REPO}/data.json`);
-    data = await res.json();
-  }catch(e){
-    data = { folders: [{id:1,name:"默认文件夹"}], links:[] };
-  }
-  document.getElementById("loading").style.display="none";
+function load() {
+  let local = localStorage.getItem(STORAGE_KEY);
+  if (local) data = JSON.parse(local);
+  document.getElementById("loading").style.display = "none";
   render();
 }
 
-async function saveCloud(){
-  const json = JSON.stringify(data,null,2);
-  await fetch(`https://api.github.com/repos/${USER}/${REPO}/dispatches`,{
-    method:"POST",
-    headers:{
-      "Authorization":"token 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",
-      "Content-Type":"application/json"
-    },
-    body:JSON.stringify({
-      event_type:"save",
-      client_payload:{data:json}
-    })
-  });
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
-function delLink(id){
-  if(!confirm("确定删除？"))return;
-  data.links = data.links.filter(x=>x.id!==id);
-  saveCloud();render();
+function delLink(id) {
+  if (!confirm("确定删除？")) return;
+  data.links = data.links.filter(x => x.id !== id);
+  save(); render();
 }
-function editLink(id){
-  let l = data.links.find(x=>x.id===id);
-  let n = prompt("修改标题",l.name);if(!n)return;
-  let a = prompt("修改作者",l.author||"");
-  l.name=n;l.author=a||"";
-  saveCloud();render();
+
+function editLink(id) {
+  let l = data.links.find(x => x.id === id);
+  let n = prompt("标题", l.name);
+  if (!n) return;
+  let a = prompt("作者", l.author || "");
+  l.name = n;
+  l.author = a || "";
+  save(); render();
 }
-function moveLink(id){
-  let l = data.links.find(x=>x.id===id);
-  let list = data.folders.map(f=>f.id+"："+f.name).join("\n");
-  let to = prompt("移动到文件夹ID：\n"+list,l.fid);
+
+function moveLink(id) {
+  let l = data.links.find(x => x.id === id);
+  let list = data.folders.map(f => f.id + "：" + f.name).join("\n");
+  let to = prompt("移动到文件夹ID：\n" + list, l.fid);
   let fid = Number(to);
-  if(data.folders.some(f=>f.id===fid)){
-    l.fid=fid;saveCloud();render();
+  if (data.folders.some(f => f.id === fid)) {
+    l.fid = fid;
+    save(); render();
   }
 }
 
-function render(){
+function render() {
   let kw = document.getElementById("search").value.toLowerCase();
   let html = "";
-  data.folders.forEach(f=>{
+  data.folders.forEach(f => {
     html += `<div class="card"><div class="folder">📁 ${f.name}</div>`;
-    data.links.filter(x=>x.fid===f.id).forEach(l=>{
-      let chs = l.chapters ? l.chapters.join(" ") : "";
-      let hide = kw && !((l.name+l.author+chs).toLowerCase().includes(kw));
+    data.links.filter(x => x.fid === f.id).forEach(l => {
+      let match = (!kw ||
+        l.name.toLowerCase().includes(kw) ||
+        (l.author || "").toLowerCase().includes(kw) ||
+        (l.chapters || []).join("").includes(kw));
       html += `
-      <div class="link-item ${hide?'hidden':''}">
+      <div class="link-item ${match ? "" : "hidden"}">
         <span class="handle">☰</span>
         <div class="link-info">
-          <div class="link-name"><a href="${l.url}" target="_blank">${l.name}</div>
-          ${l.author?`<div class="link-author">${l.author}</div>`:""}
-          ${chs?`<div class="link-chapters">${l.chapters.map(c=>`<span class="chip">第${c}章</span>`).join("")}</div>`:""}
+          <div class="link-name"><a href="${l.url}" target="_blank">${l.name}</a></div>
+          ${l.author ? `<div class="link-author">${l.author}</div>` : ""}
+          ${l.chapters ? `<div class="link-chapters">${l.chapters.map(c => `<span class="chip">第${c}章</span>`).join("")}</div>` : ""}
         </div>
         <span class="edit" onclick="editLink(${l.id})">编辑</span>
         <span class="move" onclick="moveLink(${l.id})">移动</span>
         <span class="del" onclick="delLink(${l.id})">删除</span>
-      </div>
-      `;
+      </div>`;
     });
     html += `</div>`;
   });
   document.getElementById("list").innerHTML = html;
 }
 
-loadData();
+load();
 </script>
 </body>
 </html>
