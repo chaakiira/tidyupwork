@@ -6,28 +6,13 @@
 <title>添加链接</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#f2f5f9;--card:#fff;--text:#333;--border:#e3e7ed;
-  --btn:#007bff;--folder:#f8f9fa
-}
-body{
-  font-family:微软雅黑,sans-serif;
-  background:var(--bg);color:var(--text);padding:12px
-}
+:root{--bg:#f2f5f9;--card:#fff;--text:#333;--border:#e3e7ed;--btn:#007bff;--folder:#f8f9fa}
+body{font-family:微软雅黑,sans-serif;background:var(--bg);color:var(--text);padding:12px}
 .container{max-width:500px;margin:0 auto}
-.header{
-  display:flex;justify-content:space-between;align-items:center;
-  margin-bottom:12px
-}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .btn{padding:8px 12px;border-radius:10px;background:var(--btn);color:white;text-decoration:none;font-size:14px}
-.card{
-  background:var(--card);border-radius:14px;padding:14px;
-  margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1)
-}
-input,select,button{
-  width:100%;padding:12px 14px;border-radius:12px;
-  margin-bottom:10px;font-size:16px;border:1px solid var(--border)
-}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+input,select,button{width:100%;padding:12px 14px;border-radius:12px;margin-bottom:10px;font-size:16px;border:1px solid var(--border)}
 button{background:var(--btn);color:white;border:none}
 .chapter-tags{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
 .chip{padding:6px 10px;background:#f1f1f1;border-radius:6px;font-size:14px;cursor:pointer}
@@ -44,7 +29,7 @@ button{background:var(--btn);color:white;border:none}
   <div class="card">
     <h3>📁 创建文件夹</h3>
     <input type="text" id="folderName" placeholder="文件夹名称">
-    <button onclick="createFolder()">创建文件夹</button>
+    <button onclick="createFolder()" id="createBtn">确认创建</button>
   </div>
 
   <div class="card">
@@ -76,11 +61,12 @@ button{background:var(--btn);color:white;border:none}
 <script>
 const GITHUB_USER = "chaakiira";
 const GITHUB_REPO = "tidyupwork";
-const GITHUB_TOKEN = "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";
+const GITHUB_TOKEN = "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";
 const FILE_PATH = "data.json";
 
 let data;
 let selectedChapters = [];
+let creating = false;
 
 function toggle(el) {
   el.classList.toggle("selected");
@@ -93,25 +79,49 @@ function toggle(el) {
 }
 
 async function load() {
-  const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
-  const json = await res.json();
-  data = JSON.parse(decodeURIComponent(escape(atob(json.content))));
-  renderFolder();
+  try {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
+    const json = await res.json();
+    const raw = decodeURIComponent(escape(atob(json.content)));
+    data = JSON.parse(raw);
+    renderFolder();
+  } catch (e) {
+    console.error("加载失败:", e);
+    data = { folders: [{ id: 1, name: "默认文件夹" }], links: [] };
+    await save("初始化 data.json");
+    renderFolder();
+  }
 }
 
 function renderFolder() {
   const sel = document.getElementById("toFolder");
-  sel.innerHTML = data.folders.map(f => `<option value="${f.id}">${f.name}</option>`).join("");
+  sel.innerHTML = data.folders.map(f => 
+    `<option value="${f.id}">${f.name}</option>`
+  ).join("");
 }
 
 async function createFolder() {
+  if (creating) return;
   const name = document.getElementById("folderName").value.trim();
-  if (!name) return alert("请输入名称");
-  data.folders.push({ id: Date.now(), name: name });
-  await save("创建文件夹");
-  renderFolder();
-  alert("创建成功！");
-  document.getElementById("folderName").value = "";
+  if (!name) {
+    alert("请输入文件夹名称");
+    return;
+  }
+  creating = true;
+  document.getElementById("createBtn").textContent = "创建中...";
+  try {
+    data.folders.push({ id: Date.now(), name: name });
+    await save(`创建文件夹：${name}`);
+    renderFolder();
+    alert("✅ 创建成功！");
+    document.getElementById("folderName").value = "";
+  } catch (e) {
+    console.error("创建失败:", e);
+    alert("❌ 创建失败：" + e.message);
+  } finally {
+    creating = false;
+    document.getElementById("createBtn").textContent = "确认创建";
+  }
 }
 
 async function addLink() {
@@ -119,18 +129,22 @@ async function addLink() {
   const author = document.getElementById("linkAuthor").value.trim();
   const url = document.getElementById("linkUrl").value.trim();
   const fid = Number(document.getElementById("toFolder").value);
-  if (!name || !url) return alert("标题和链接不能为空");
-
-  data.links.push({
-    id: Date.now(),
-    name, author, url, fid,
-    chapters: selectedChapters,
-    sort: Date.now()
-  });
-
-  await save("添加链接");
-  alert("保存成功");
-  location.href = "index.html";
+  if (!name || !url) {
+    alert("标题和链接不能为空");
+    return;
+  }
+  try {
+    data.links.push({
+      id: Date.now(), name, author, url, fid,
+      chapters: selectedChapters, sort: Date.now()
+    });
+    await save("添加链接");
+    alert("保存成功");
+    location.href = "index.html";
+  } catch (e) {
+    console.error("添加失败:", e);
+    alert("❌ 保存失败：" + e.message);
+  }
 }
 
 async function save(msg) {
