@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>新建内容</title>
+<title>添加/新建文件夹</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:微软雅黑;background:#f2f5f9;padding:12px}
@@ -14,14 +14,14 @@ body{font-family:微软雅黑;background:#f2f5f9;padding:12px}
 input,select,button{width:100%;padding:12px;border-radius:10px;border:1px solid #ddd;margin:6px 0}
 button{background:#007bff;color:#fff;border:none}
 .chapter-tags{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
-.chip{padding:6px 10px;background:#f1f1f1;border-radius:6px;font-size:14px;cursor:pointer}
+.chip{padding:6px 10px;background:#f1f1f1;border-radius:6px;cursor:pointer}
 .chip.selected{background:#007bff;color:white}
 </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
-    <h2>新建 / 添加</h2>
+    <h2>添加/新建文件夹</h2>
     <a class="btn" href="index.html">← 返回</a>
   </div>
 
@@ -55,63 +55,53 @@ button{background:#007bff;color:#fff;border:none}
   </div>
 
 <script>
-const USER = "chaakiira";
-const REPO = "tidyupwork";
-const TOKEN = "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";
-let data = {};
-let chs = [];
+const STORAGE_KEY = "my_links_data";
+let data = { folders: [{ id: 1, name: "默认文件夹" }], links: [] };
+let selected = [];
 
-async function load(){
-  let res = await fetch(`https://cdn.jsdelivr.net/gh/${USER}/${REPO}/data.json`);
-  data = await res.json();
-  renderFold();
+function load() {
+  let local = localStorage.getItem(STORAGE_KEY);
+  if (local) data = JSON.parse(local);
+  renderFolders();
 }
-function renderFold(){
-  let s = document.getElementById("foldList");
-  s.innerHTML = data.folders.map(f=>`<option value="${f.id}">${f.name}</option>`).join("");
+
+function renderFolders() {
+  let sel = document.getElementById("foldList");
+  sel.innerHTML = data.folders.map(f => `<option value="${f.id}">${f.name}</option>`).join("");
 }
-function sel(el){
+
+function sel(el) {
   el.classList.toggle("selected");
-  let c = el.dataset.ch;
-  if(chs.includes(c)) chs = chs.filter(x=>x!==c);
-  else chs.push(c);
+  let ch = el.dataset.ch;
+  selected.includes(ch) ? selected = selected.filter(x => x !== ch) : selected.push(ch);
 }
-async function createFolder(){
+
+function createFolder() {
   let name = document.getElementById("foldName").value.trim();
-  if(!name) return alert("请输入文件夹名");
-  data.folders.push({id:Date.now(),name});
-  await save();
-  renderFold();
-  alert("✅ 文件夹创建成功，永久保存！");
-  document.getElementById("foldName").value="";
+  if (!name) return alert("请输入文件夹名称");
+  data.folders.push({ id: Date.now(), name });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  renderFolders();
+  alert("✅ 创建成功！永久保存！");
+  document.getElementById("foldName").value = "";
 }
-async function addLink(){
+
+function addLink() {
   let name = document.getElementById("title").value.trim();
   let author = document.getElementById("author").value.trim();
   let url = document.getElementById("url").value.trim();
   let fid = Number(document.getElementById("foldList").value);
-  if(!name||!url)return alert("标题和链接必填");
+  if (!name || !url) return alert("标题和链接不能为空");
+
   data.links.push({
-    id:Date.now(),name,author,url,fid,chapters:chs
+    id: Date.now(), name, author, url, fid, chapters: selected
   });
-  await save();
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   alert("保存成功");
-  location.href="index.html";
+  location.href = "index.html";
 }
-async function save(){
-  let json = JSON.stringify(data,null,2);
-  await fetch(`https://api.github.com/repos/${USER}/${REPO}/dispatches`,{
-    method:"POST",
-    headers:{
-      "Authorization":"token "+TOKEN,
-      "Content-Type":"application/json"
-    },
-    body:JSON.stringify({
-      event_type:"save",
-      client_payload:{data:json}
-    })
-  });
-}
+
 load();
 </script>
 </body>
