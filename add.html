@@ -12,7 +12,7 @@ body{background:#f2f5f9;font-family:微软雅黑;padding:12px}
 .btn{padding:8px 12px;background:#007bff;color:#fff;border-radius:10px;text-decoration:none}
 .card{background:#fff;border-radius:14px;padding:15px;margin-bottom:15px}
 input,button{width:100%;padding:12px;border-radius:10px;border:1px solid #ddd;margin:6px 0}
-button{background:#007bff;color:#fff;border:none}
+button{background:#007bff;color:#fff;border:none;cursor:pointer}
 </style>
 </head>
 <body>
@@ -42,25 +42,44 @@ const supabase = supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrcnBtb3hlcWFrcndicW5kYnFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NTQwNTAsImV4cCI6MjA5MjUzMDA1MH0.U839r7rZSpC6WpzsvGQx-dum0gacakUsBzyaSSs4XVw"
 );
 
+// 修复版：直接写死，保证点击能触发
 async function addFolder() {
-  let name = document.getElementById('fname').value.trim();
-  if (!name) return alert('请输入名称');
-  await supabase.from('folders').insert([{ name }]);
-  alert('创建成功！云端保存');
-  document.getElementById('fname').value = '';
+  const name = document.getElementById('fname').value.trim();
+  if (!name) {
+    alert('请输入文件夹名称');
+    return;
+  }
+  try {
+    const { error } = await supabase.from('folders').insert([{ name }]);
+    if (error) throw error;
+    alert('✅ 创建成功！云端已保存');
+    document.getElementById('fname').value = '';
+  } catch (err) {
+    alert('创建失败：' + err.message);
+  }
 }
 
 async function addLink() {
-  let name = document.getElementById('title').value.trim();
-  let url = document.getElementById('url').value.trim();
-  if (!name || !url) return alert('标题和链接必填');
+  const name = document.getElementById('title').value.trim();
+  const url = document.getElementById('url').value.trim();
+  if (!name || !url) {
+    alert('标题和链接不能为空');
+    return;
+  }
+  try {
+    // 自动找第一个文件夹，保证能存进去
+    const { data: folders, error: fErr } = await supabase.from('folders').select('id').limit(1);
+    if (fErr) throw fErr;
+    const folderId = folders?.[0]?.id || 1;
 
-  let { data: fs } = await supabase.from('folders').select('id').limit(1);
-  let fid = fs?.[0]?.id || 1;
+    const { error } = await supabase.from('links').insert([{ folder_id: folderId, name, url }]);
+    if (error) throw error;
 
-  await supabase.from('links').insert([{ folder_id: fid, name, url }]);
-  alert('保存成功');
-  location.href = 'index.html';
+    alert('保存成功！返回首页查看');
+    location.href = 'index.html';
+  } catch (err) {
+    alert('保存失败：' + err.message);
+  }
 }
 </script>
 </body>
