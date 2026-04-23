@@ -23,27 +23,66 @@ button{background:var(--btn);color:white;border:none}
     <a class="btn" href="index.html">← 返回</a>
   </div>
   <div class="card">
+    <input type="text" id="folderName" placeholder="输入新文件夹名称">
+    <button onclick="addFolder()">创建文件夹</button>
+  </div>
+  <div class="card">
     <input type="text" id="name" placeholder="标题（必填）">
     <input type="text" id="author" placeholder="作者（选填）">
     <input type="url" id="url" placeholder="链接地址（必填）">
     <select id="folder"></select>
-    <button onclick="addLink()">保存</button>
+    <button onclick="addLink()">保存并返回</button>
   </div>
 </div>
 
 <script>
-const GITHUB_USER = "你的GitHub用户名";
-const GITHUB_REPO = "你的仓库名";
-const GITHUB_TOKEN = "你的GitHub个人访问令牌";
+const GITHUB_USER = "chaakiira";
+const GITHUB_REPO = "tidyupwork";
+const GITHUB_TOKEN = "把你自己的token粘贴在这里";
 const FILE_PATH = "data.json";
 let data;
 
 async function load() {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
+    const json = await res.json();
+    data = JSON.parse(decodeURIComponent(escape(atob(json.content))));
+    const sel = document.getElementById("folder");
+    sel.innerHTML = data.folders.map(f => `<option value="${f.id}">${f.name}</option>`).join("");
+  } catch (e) {
+    alert("加载失败：" + e.message);
+  }
+}
+
+async function save(message) {
   const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
-  const json = await res.json();
-  data = JSON.parse(atob(json.content));
-  const sel = document.getElementById("folder");
-  sel.innerHTML = data.folders.map(f => `<option value="${f.id}">${f.name}</option>`).join("");
+  let sha;
+  if (res.ok) {
+    const json = await res.json();
+    sha = json.sha;
+  }
+  const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+  const body = { message, content };
+  if (sha) body.sha = sha;
+
+  await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`, {
+    method: "PUT",
+    headers: {
+      "Authorization": `token ${GITHUB_TOKEN}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+}
+
+async function addFolder() {
+  const name = document.getElementById("folderName").value.trim();
+  if (!name) return alert("请输入文件夹名称");
+  data.folders.push({ id: Date.now(), name });
+  await save("create folder");
+  document.getElementById("folderName").value = "";
+  await load();
+  alert("创建成功");
 }
 
 async function addLink() {
@@ -53,26 +92,13 @@ async function addLink() {
   const fid = Number(document.getElementById("folder").value);
   if (!name || !url) return alert("标题和链接不能为空");
   
-  data.links.push({
-    id: "link-" + Date.now(),
-    name, author, url, fid
-  });
-  
-  const content = btoa(JSON.stringify(data, null, 2));
-  await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`, {
-    method: "PUT",
-    headers: {
-      "Authorization": `token ${GITHUB_TOKEN}`,
-      "Accept": "application/vnd.github.v3+json"
-    },
-    body: JSON.stringify({
-      message: "添加链接",
-      content: content
-    })
-  });
+  data.links.push({ id: "link-"+Date.now(), name, author, url, fid });
+  await save("add link");
   alert("保存成功");
   location.href = "index.html";
 }
 
 load();
 </script>
+</body>
+</html>
