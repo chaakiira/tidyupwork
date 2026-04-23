@@ -1,54 +1,124 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>目录</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的网盘</title>
 <style>
-body{background:#f5f6f8;font-family:微软雅黑;margin:0;padding:12px;}
-.box{background:#fff;border-radius:12px;padding:15px;margin-bottom:10px;}
-.folder{font-size:16px;font-weight:bold;margin-bottom:8px;}
-.item{padding:6px 0;border-bottom:1px solid #eee;}
-a{color:#007aff;text-decoration:none;}
-.bar{display:flex;gap:10px;margin-bottom:15px;}
-.btn{padding:6px 12px;background:#007aff;color:#fff;border-radius:6px;}
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f2f5f9;--card:#fff;--text:#333;--border:#e3e7ed;--btn:#007bff;--del:#ff3b30;--folder:#f8f9fa}
+body{font-family:微软雅黑,sans-serif;background:var(--bg);color:var(--text);padding:12px}
+.container{max-width:500px;margin:0 auto}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.header h1{font-size:20px}
+.btn{padding:8px 12px;border-radius:10px;background:var(--btn);color:white;text-decoration:none;font-size:14px}
+.search-box{margin-bottom:12px}
+.search-box input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card);font-size:16px}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.folder{font-weight:600;padding:12px;background:var(--folder);border-radius:10px;margin-bottom:8px}
+.link-item{display:flex;flex-wrap:wrap;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);gap:8px}
+.link-info{flex:1;min-width:0}
+.link-name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.link-author{font-size:13px;color:#888}
+.link-item a{color:var(--btn);text-decoration:none}
+.link-chapters{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.chip{font-size:12px;padding:2px 6px;border-radius:6px;background:var(--folder);color:var(--text)}
+.edit,.move,.del{font-size:14px;padding:4px 6px}
+.edit{color:#007bff}
+.move{color:#ff9500}
+.del{color:var(--del)}
+.handle{cursor:move;color:#999;padding:0 4px}
+.hidden{display:none}
+.loading{text-align:center;padding:20px}
 </style>
 </head>
 <body>
-
-<div class="bar">
-  <a class="btn" href="add.html">新建文件夹/添加</a>
+<div class="container">
+  <div class="header">
+    <h1>🔗 共享网盘</h1>
+    <a class="btn" href="add.html">➕ 添加/新建文件夹</a>
+  </div>
+  <div class="search-box">
+    <input type="text" id="search" placeholder="🔍 搜索标题/作者/章节..." oninput="render()">
+  </div>
+  <div id="loading" class="loading">加载中...</div>
+  <div id="list"></div>
 </div>
-<div id="wrap"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-// 本地永久储存
-const KEY = "dataList";
-let data = JSON.parse(localStorage.getItem(KEY)) || {
-  folders: [{id:1,name:"默认文件夹"}],
-  links:[]
-};
+const SUPABASE_URL = "https://qkrpmoxeqakrwbqndbgg.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrcnBtb3hlcWFrcndicW5kYnFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NTQwNTAsImV4cCI6MjA5MjUzMDA1MH0.U839r7rZSpC6WpzsvGQx-dum0gacakUsBzyaSSs4XVw";
 
-function save(){
-  localStorage.setItem(KEY, JSON.stringify(data));
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let folders = [];
+let links = [];
+
+async function loadData() {
+  const { data: f } = await supabase.from('folders').select('*');
+  const { data: l } = await supabase.from('links').select('*');
+  folders = f || [];
+  links = l || [];
+  document.getElementById("loading").style.display = "none";
+  render();
 }
 
-function render(){
+async function delLink(id) {
+  if (!confirm("确定删除？")) return;
+  await supabase.from('links').delete().eq('id', id);
+  links = links.filter(x => x.id !== id);
+  render();
+}
+
+async function editLink(id) {
+  let l = links.find(x => x.id === id);
+  let n = prompt("修改标题", l.name);
+  if (!n) return;
+  let a = prompt("修改作者", l.author || "");
+  await supabase.from('links').update({ name: n, author: a || "" }).eq('id', id);
+  l.name = n; l.author = a || "";
+  render();
+}
+
+async function moveLink(id) {
+  let l = links.find(x => x.id === id);
+  let list = folders.map(f => `${f.id}：${f.name}`).join("\n");
+  let to = prompt("移动到文件夹ID：\n" + list, l.folder_id);
+  let fid = Number(to);
+  if (folders.some(f => f.id === fid)) {
+    await supabase.from('links').update({ folder_id: fid }).eq('id', id);
+    l.folder_id = fid;
+    render();
+  }
+}
+
+function render() {
+  let kw = document.getElementById("search").value.toLowerCase();
   let html = "";
-  data.folders.forEach(f=>{
-    html += `<div class="box">
-      <div class="folder">📁 ${f.name}</div>`;
-    data.links.filter(x=>x.fid===f.id).forEach(link=>{
-      html += `<div class="item">
-        <a href="${link.url}" target="_blank">${link.name}</a>
+  folders.forEach(f => {
+    html += `<div class="card"><div class="folder">📁 ${f.name}</div>`;
+    links.filter(x => x.folder_id === f.id).forEach(l => {
+      let chs = (l.chapters || []).join(" ");
+      let hide = kw && !((l.name + (l.author || "") + chs).toLowerCase().includes(kw));
+      html += `
+      <div class="link-item ${hide ? "hidden" : ""}">
+        <span class="handle">☰</span>
+        <div class="link-info">
+          <div class="link-name"><a href="${l.url}" target="_blank">${l.name}</a></div>
+          ${l.author ? `<div class="link-author">${l.author}</div>` : ""}
+          ${chs ? `<div class="link-chapters">${(l.chapters || []).map(c => `<span class="chip">第${c}章</span>`).join("")}</div>` : ""}
+        </div>
+        <span class="edit" onclick="editLink(${l.id})">编辑</span>
+        <span class="move" onclick="moveLink(${l.id})">移动</span>
+        <span class="del" onclick="delLink(${l.id})">删除</span>
       </div>`;
-    })
+    });
     html += `</div>`;
-  })
-  document.getElementById("wrap").innerHTML = html;
+  });
+  document.getElementById("list").innerHTML = html;
 }
 
-render();
+loadData();
 </script>
 </body>
 </html>
