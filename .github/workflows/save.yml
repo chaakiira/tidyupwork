@@ -1,0 +1,21 @@
+name: Save Data
+
+on:
+  repository_dispatch:
+    types: [save]
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 写入数据
+        run: |
+          echo '${{ github.event.client_payload.data }}' > data.json
+      - name: 提交更新
+        run: |
+          git config --global user.name "bot"
+          git config --global user.email "bot@example.com"
+          git add data.json
+          git commit -m "auto save"
+          git push
