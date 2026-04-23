@@ -75,7 +75,7 @@ body{
 <script>
 const GITHUB_USER = "chaakiira";
 const GITHUB_REPO = "tidyupwork";
-const GITHUB_TOKEN = "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";
+const GITHUB_TOKEN = "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";
 const FILE_PATH = "data.json";
 
 let data = { folders: [], links: [] };
@@ -172,7 +172,7 @@ function render() {
         <span class="handle">☰</span>
         <div class="link-info">
           <div class="link-name"><a href="${l.url}" target="_blank">${l.name}</a></div>
-          ${l.author ? `<div class="link-author">${l.author}</div>` : ""}
+          ${l.author ? `<div class="link-author">作者：${l.author}</div>` : ""}
           ${l.chapters && l.chapters.length ? `
           <div class="link-chapters">
             ${l.chapters.map(ch => `<span class="chip">第${ch}章</span>`).join("")}
