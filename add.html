@@ -3,17 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>添加链接</title>
+<title>新建内容</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#f2f5f9;--card:#fff;--text:#333;--border:#e3e7ed;--btn:#007bff;--folder:#f8f9fa}
-body{font-family:微软雅黑,sans-serif;background:var(--bg);color:var(--text);padding:12px}
+body{font-family:微软雅黑;background:#f2f5f9;padding:12px}
 .container{max-width:500px;margin:0 auto}
-.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.btn{padding:8px 12px;border-radius:10px;background:var(--btn);color:white;text-decoration:none;font-size:14px}
-.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
-input,select,button{width:100%;padding:12px 14px;border-radius:12px;margin-bottom:10px;font-size:16px;border:1px solid var(--border)}
-button{background:var(--btn);color:white;border:none}
+.header{display:flex;justify-content:space-between;margin-bottom:15px}
+.btn{padding:8px 12px;background:#007bff;color:#fff;border-radius:10px;text-decoration:none}
+.card{background:#fff;border-radius:14px;padding:15px;margin-bottom:15px}
+input,select,button{width:100%;padding:12px;border-radius:10px;border:1px solid #ddd;margin:6px 0}
+button{background:#007bff;color:#fff;border:none}
 .chapter-tags{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
 .chip{padding:6px 10px;background:#f1f1f1;border-radius:6px;font-size:14px;cursor:pointer}
 .chip.selected{background:#007bff;color:white}
@@ -22,151 +21,97 @@ button{background:var(--btn);color:white;border:none}
 <body>
 <div class="container">
   <div class="header">
-    <h1>➕ 添加链接</h1>
+    <h2>新建 / 添加</h2>
     <a class="btn" href="index.html">← 返回</a>
   </div>
 
   <div class="card">
-    <h3>📁 创建文件夹</h3>
-    <input type="text" id="folderName" placeholder="文件夹名称">
-    <button onclick="createFolder()" id="createBtn">确认创建</button>
+    <h4>📁 新建文件夹</h4>
+    <input type="text" id="foldName" placeholder="输入文件夹名称">
+    <button onclick="createFolder()">确认创建</button>
   </div>
 
   <div class="card">
-    <input type="text" id="linkName" placeholder="标题">
-    <input type="text" id="linkAuthor" placeholder="作者">
-    <input type="url" id="linkUrl" placeholder="链接地址">
-
+    <input type="text" id="title" placeholder="标题">
+    <input type="text" id="author" placeholder="作者">
+    <input type="url" id="url" placeholder="链接">
     <div style="margin:10px 0">
-      <div>选择章节（可多选）</div>
+      <div>选择章节</div>
       <div class="chapter-tags">
-        <span class="chip" onclick="toggle(this)" data-ch="1">第1章</span>
-        <span class="chip" onclick="toggle(this)" data-ch="2">第2章</span>
-        <span class="chip" onclick="toggle(this)" data-ch="3">第3章</span>
-        <span class="chip" onclick="toggle(this)" data-ch="4">第4章</span>
-        <span class="chip" onclick="toggle(this)" data-ch="5">第5章</span>
-        <span class="chip" onclick="toggle(this)" data-ch="6">第6章</span>
-        <span class="chip" onclick="toggle(this)" data-ch="7">第7章</span>
-        <span class="chip" onclick="toggle(this)" data-ch="8">第8章</span>
-        <span class="chip" onclick="toggle(this)" data-ch="9">第9章</span>
-        <span class="chip" onclick="toggle(this)" data-ch="10">第10章</span>
+        <span class="chip" data-ch="1" onclick="sel(this)">1</span>
+        <span class="chip" data-ch="2" onclick="sel(this)">2</span>
+        <span class="chip" data-ch="3" onclick="sel(this)">3</span>
+        <span class="chip" data-ch="4" onclick="sel(this)">4</span>
+        <span class="chip" data-ch="5" onclick="sel(this)">5</span>
+        <span class="chip" data-ch="6" onclick="sel(this)">6</span>
+        <span class="chip" data-ch="7" onclick="sel(this)">7</span>
+        <span class="chip" data-ch="8" onclick="sel(this)">8</span>
+        <span class="chip" data-ch="9" onclick="sel(this)">9</span>
+        <span class="chip" data-ch="10" onclick="sel(this)">10</span>
       </div>
     </div>
-
-    <select id="toFolder"></select>
-    <button onclick="addLink()">保存</button>
+    <select id="foldList"></select>
+    <button onclick="addLink()">保存链接</button>
   </div>
-</div>
 
 <script>
-const GITHUB_USER = "chaakiira";
-const GITHUB_REPO = "tidyupwork";
-const GITHUB_TOKEN = "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";
-const FILE_PATH = "data.json";
+const USER = "chaakiira";
+const REPO = "tidyupwork";
+const TOKEN = "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";
+let data = {};
+let chs = [];
 
-let data;
-let selectedChapters = [];
-let creating = false;
-
-function toggle(el) {
+async function load(){
+  let res = await fetch(`https://cdn.jsdelivr.net/gh/${USER}/${REPO}/data.json`);
+  data = await res.json();
+  renderFold();
+}
+function renderFold(){
+  let s = document.getElementById("foldList");
+  s.innerHTML = data.folders.map(f=>`<option value="${f.id}">${f.name}</option>`).join("");
+}
+function sel(el){
   el.classList.toggle("selected");
-  const ch = el.dataset.ch;
-  if (selectedChapters.includes(ch)) {
-    selectedChapters = selectedChapters.filter(c => c !== ch);
-  } else {
-    selectedChapters.push(ch);
-  }
+  let c = el.dataset.ch;
+  if(chs.includes(c)) chs = chs.filter(x=>x!==c);
+  else chs.push(c);
 }
-
-async function load() {
-  try {
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
-    const json = await res.json();
-    const raw = decodeURIComponent(escape(atob(json.content)));
-    data = JSON.parse(raw);
-    renderFolder();
-  } catch (e) {
-    console.error("加载失败:", e);
-    data = { folders: [{ id: 1, name: "默认文件夹" }], links: [] };
-    await save("初始化 data.json");
-    renderFolder();
-  }
+async function createFolder(){
+  let name = document.getElementById("foldName").value.trim();
+  if(!name) return alert("请输入文件夹名");
+  data.folders.push({id:Date.now(),name});
+  await save();
+  renderFold();
+  alert("✅ 文件夹创建成功，永久保存！");
+  document.getElementById("foldName").value="";
 }
-
-function renderFolder() {
-  const sel = document.getElementById("toFolder");
-  sel.innerHTML = data.folders.map(f => 
-    `<option value="${f.id}">${f.name}</option>`
-  ).join("");
+async function addLink(){
+  let name = document.getElementById("title").value.trim();
+  let author = document.getElementById("author").value.trim();
+  let url = document.getElementById("url").value.trim();
+  let fid = Number(document.getElementById("foldList").value);
+  if(!name||!url)return alert("标题和链接必填");
+  data.links.push({
+    id:Date.now(),name,author,url,fid,chapters:chs
+  });
+  await save();
+  alert("保存成功");
+  location.href="index.html";
 }
-
-async function createFolder() {
-  if (creating) return;
-  const name = document.getElementById("folderName").value.trim();
-  if (!name) {
-    alert("请输入文件夹名称");
-    return;
-  }
-  creating = true;
-  document.getElementById("createBtn").textContent = "创建中...";
-  try {
-    data.folders.push({ id: Date.now(), name: name });
-    await save(`创建文件夹：${name}`);
-    renderFolder();
-    alert("✅ 创建成功！刷新不会消失！");
-    document.getElementById("folderName").value = "";
-  } catch (e) {
-    console.error("创建失败:", e);
-    alert("❌ 创建失败：" + e.message);
-  } finally {
-    creating = false;
-    document.getElementById("createBtn").textContent = "确认创建";
-  }
-}
-
-async function addLink() {
-  const name = document.getElementById("linkName").value.trim();
-  const author = document.getElementById("linkAuthor").value.trim();
-  const url = document.getElementById("linkUrl").value.trim();
-  const fid = Number(document.getElementById("toFolder").value);
-  if (!name || !url) {
-    alert("标题和链接不能为空");
-    return;
-  }
-  try {
-    data.links.push({
-      id: Date.now(), name, author, url, fid,
-      chapters: selectedChapters, sort: Date.now()
-    });
-    await save("添加链接");
-    alert("保存成功");
-    location.href = "index.html";
-  } catch (e) {
-    console.error("添加失败:", e);
-    alert("❌ 保存失败：" + e.message);
-  }
-}
-
-async function save(msg) {
-  const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
-  let sha = "";
-  if (res.ok) {
-    const j = await res.json();
-    sha = j.sha;
-  }
-  const str = JSON.stringify(data, null, 2);
-  const content = btoa(unescape(encodeURIComponent(str)));
-
-  await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`, {
-    method: "PUT",
-    headers: {
-      "Authorization": "token " + GITHUB_TOKEN,
-      "Content-Type": "application/json"
+async function save(){
+  let json = JSON.stringify(data,null,2);
+  await fetch(`https://api.github.com/repos/${USER}/${REPO}/dispatches`,{
+    method:"POST",
+    headers:{
+      "Authorization":"token "+TOKEN,
+      "Content-Type":"application/json"
     },
-    body: JSON.stringify({ message: msg, content, sha })
+    body:JSON.stringify({
+      event_type:"save",
+      client_payload:{data:json}
+    })
   });
 }
-
 load();
 </script>
 </body>
