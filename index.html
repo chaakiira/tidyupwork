@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>共享链接网盘</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f2f5f9;--card:#fff;--text:#333;--border:#e3e7ed;--btn:#007bff;--del:#ff3b30;--folder:#f8f9fa}
+body{font-family:微软雅黑,sans-serif;background:var(--bg);color:var(--text);padding:12px}
+.container{max-width:500px;margin:0 auto}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.header h1{font-size:20px}
+.btn{padding:8px 12px;border-radius:10px;background:var(--btn);color:white;text-decoration:none;font-size:14px}
+.search-box{margin-bottom:12px}
+.search-box input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card);font-size:16px}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.folder{font-weight:600;padding:12px;background:var(--folder);border-radius:10px;margin-bottom:8px}
+.link-item{display:flex;flex-wrap:wrap;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);gap:8px}
+.link-info{flex:1;min-width:0}
+.link-name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.link-author{font-size:13px;color:#888}
+.link-item a{color:var(--btn);text-decoration:none}
+.edit,.move,.del{font-size:14px;padding:4px 6px}
+.edit{color:#007bff}
+.del{color:var(--del)}
+.hidden{display:none}
+.loading{text-align:center;padding:20px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🔗 共享链接网盘</h1>
+    <a class="btn" href="add.html">➕ 添加链接</a>
+  </div>
+  <div class="search-box">
+    <input type="text" id="search" placeholder="🔍 搜索标题/作者" oninput="search()">
+  </div>
+  <div id="loading" class="loading">加载中...</div>
+  <div id="list"></div>
+</div>
+
+<script>
+// ========== 你只需要改这里 ==========
+const GITHUB_USER = "chaakiira";
+const GITHUB_REPO = "tidyupwork";
+const GITHUB_TOKEN = "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";
+// ==================================
+
+const FILE_PATH = "data.json";
+let data = { folders: [], links: [] };
+
+async function loadData() {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
+    const json = await res.json();
+    const content = atob(json.content);
+    data = JSON.parse(content);
+    render();
+    document.getElementById("loading").style.display = "none";
+  } catch (e) {
+    data = { folders: [{ id: 1, name: "默认文件夹" }], links: [] };
+    await saveData();
+    render();
+    document.getElementById("loading").style.display = "none";
+  }
+}
+
+async function saveData() {
+  const content = btoa(JSON.stringify(data, null, 2));
+  const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`, {
+    method: "PUT",
+    headers: {
+      "Authorization": `token ${GITHUB_TOKEN}`,
+      "Accept": "application/vnd.github.v3+json"
+    },
+    body: JSON.stringify({
+      message: "更新数据",
+      content: content
+    })
+  });
+  return res.ok;
+}
+
+function render() {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+  data.folders.forEach(f => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<div class="folder">📁 ${f.name}</div>`;
+    const items = data.links.filter(l => l.fid === f.id);
+    items.forEach(l => {
+      card.innerHTML += `
+      <div class="link-item" data-name="${l.name}" data-author="${l.author||''}">
+        <div class="link-info">
+          <div class="link-name"><a href="${l.url}" target="_blank">${l.name}</a></div>
+          ${l.author ? `<div class="link-author">${l.author}</div>` : ""}
+        </div>
+        <span class="del" onclick="delLink('${l.id}')">删除</span>
+      </div>`;
+    });
+    list.appendChild(card);
+  });
+}
+
+function search() {
+  const kw = document.getElementById("search").value.toLowerCase();
+  document.querySelectorAll(".link-item").forEach(i => {
+    const t = (i.dataset.name + " " + i.dataset.author).toLowerCase();
+    i.classList.toggle("hidden", kw && !t.includes(kw));
+  });
+  document.querySelectorAll(".card").forEach(c => {
+    const has = c.querySelector(".link-item:not(.hidden)");
+    c.classList.toggle("hidden", !has);
+  });
+}
+
+async function delLink(id) {
+  if (!confirm("确定删除？")) return;
+  data.links = data.links.filter(l => l.id !== id);
+  await saveData();
+  render();
+}
+
+loadData();
+</script>
+</body>
+</html>

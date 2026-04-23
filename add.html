@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>添加链接</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f2f5f9;--card:#fff;--text:#333;--border:#e3e7ed;--btn:#007bff}
+body{font-family:微软雅黑,sans-serif;background:var(--bg);color:var(--text);padding:12px}
+.container{max-width:500px;margin:0 auto}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.btn{padding:8px 12px;border-radius:10px;background:var(--btn);color:white;text-decoration:none;font-size:14px}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
+input,select,button{width:100%;padding:12px 14px;border-radius:12px;margin-bottom:10px;font-size:16px;border:1px solid var(--border)}
+button{background:var(--btn);color:white;border:none}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>➕ 添加链接</h1>
+    <a class="btn" href="index.html">← 返回</a>
+  </div>
+  <div class="card">
+    <input type="text" id="name" placeholder="标题（必填）">
+    <input type="text" id="author" placeholder="作者（选填）">
+    <input type="url" id="url" placeholder="链接地址（必填）">
+    <select id="folder"></select>
+    <button onclick="addLink()">保存</button>
+  </div>
+</div>
+
+<script>
+const GITHUB_USER = "你的GitHub用户名";
+const GITHUB_REPO = "你的仓库名";
+const GITHUB_TOKEN = "你的GitHub个人访问令牌";
+const FILE_PATH = "data.json";
+let data;
+
+async function load() {
+  const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
+  const json = await res.json();
+  data = JSON.parse(atob(json.content));
+  const sel = document.getElementById("folder");
+  sel.innerHTML = data.folders.map(f => `<option value="${f.id}">${f.name}</option>`).join("");
+}
+
+async function addLink() {
+  const name = document.getElementById("name").value.trim();
+  const author = document.getElementById("author").value.trim();
+  const url = document.getElementById("url").value.trim();
+  const fid = Number(document.getElementById("folder").value);
+  if (!name || !url) return alert("标题和链接不能为空");
+  
+  data.links.push({
+    id: "link-" + Date.now(),
+    name, author, url, fid
+  });
+  
+  const content = btoa(JSON.stringify(data, null, 2));
+  await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`, {
+    method: "PUT",
+    headers: {
+      "Authorization": `token ${GITHUB_TOKEN}`,
+      "Accept": "application/vnd.github.v3+json"
+    },
+    body: JSON.stringify({
+      message: "添加链接",
+      content: content
+    })
+  });
+  alert("保存成功");
+  location.href = "index.html";
+}
+
+load();
+</script>
