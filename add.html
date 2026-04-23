@@ -37,12 +37,12 @@ button{background:#007bff;color:#fff;border:none;cursor:pointer}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const supabase = supabase.createClient(
-  "https://qkrpmoxeqakrwbqndbgg.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrcnBtb3hlcWFrcndicW5kYnFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NTQwNTAsImV4cCI6MjA5MjUzMDA1MH0.U839r7rZSpC6WpzsvGQx-dum0gacakUsBzyaSSs4XVw"
-);
+// 只声明一次 supabase
+const SUPABASE_URL = "https://qkrpmoxeqakrwbqndbgg.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrcnBtb3hlcWFrcndicW5kYnFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NTQwNTAsImV4cCI6MjA5MjUzMDA1MH0.U839r7rZSpC6WpzsvGQx-dum0gacakUsBzyaSSs4XVw";
 
-// 修复版：直接写死，保证点击能触发
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 async function addFolder() {
   const name = document.getElementById('fname').value.trim();
   if (!name) {
@@ -50,8 +50,7 @@ async function addFolder() {
     return;
   }
   try {
-    const { error } = await supabase.from('folders').insert([{ name }]);
-    if (error) throw error;
+    await supabase.from('folders').insert([{ name }]);
     alert('✅ 创建成功！云端已保存');
     document.getElementById('fname').value = '';
   } catch (err) {
@@ -67,14 +66,10 @@ async function addLink() {
     return;
   }
   try {
-    // 自动找第一个文件夹，保证能存进去
-    const { data: folders, error: fErr } = await supabase.from('folders').select('id').limit(1);
-    if (fErr) throw fErr;
+    const { data: folders } = await supabase.from('folders').select('id').limit(1);
     const folderId = folders?.[0]?.id || 1;
 
-    const { error } = await supabase.from('links').insert([{ folder_id: folderId, name, url }]);
-    if (error) throw error;
-
+    await supabase.from('links').insert([{ folder_id: folderId, name, url }]);
     alert('保存成功！返回首页查看');
     location.href = 'index.html';
   } catch (err) {
