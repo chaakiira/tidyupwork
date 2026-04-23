@@ -1,54 +1,113 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>新建</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新建/添加</title>
 <style>
-body{padding:15px;font-family:微软雅黑;background:#f5f6f8;}
-.box{background:#fff;border-radius:12px;padding:15px;margin-bottom:15px;}
-input,button{width:100%;box-sizing:border-box;padding:10px;margin:6px 0;border-radius:6px;border:1px #ddd solid;}
-button{background:#007aff;color:#fff;border:none;}
-a{color:#007aff;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:微软雅黑;background:#f2f5f9;padding:12px}
+.container{max-width:500px;margin:0 auto}
+.header{display:flex;justify-content:space-between;margin-bottom:15px}
+.btn{padding:8px 12px;background:#007bff;color:#fff;border-radius:10px;text-decoration:none}
+.card{background:#fff;border-radius:14px;padding:15px;margin-bottom:15px}
+input,select,button{width:100%;padding:12px;border-radius:10px;border:1px solid #ddd;margin:6px 0}
+button{background:#007bff;color:#fff;border:none}
+.chapter-tags{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.chip{padding:6px 10px;background:#f1f1f1;border-radius:6px;cursor:pointer}
+.chip.selected{background:#007bff;color:white}
 </style>
 </head>
 <body>
+<div class="container">
+  <div class="header">
+    <h2>新建/添加</h2>
+    <a class="btn" href="index.html">← 返回</a>
+  </div>
 
-<a href="index.html">← 返回首页</a>
+  <div class="card">
+    <h4>📁 新建文件夹（云端永久保存）</h4>
+    <input type="text" id="foldName" placeholder="输入文件夹名称">
+    <button onclick="createFolder()">确认创建</button>
+  </div>
 
-<div class="box">
-  <h4>新建文件夹</h4>
-  <input id="fname" placeholder="输入文件夹名称">
-  <button onclick="addFolder()">确认创建</button>
-</div>
+  <div class="card">
+    <input type="text" id="title" placeholder="标题">
+    <input type="text" id="author" placeholder="作者">
+    <input type="url" id="url" placeholder="链接">
+    <div style="margin:10px 0">
+      <div>选择章节</div>
+      <div class="chapter-tags">
+        <span class="chip" data-ch="1" onclick="sel(this)">1</span>
+        <span class="chip" data-ch="2" onclick="sel(this)">2</span>
+        <span class="chip" data-ch="3" onclick="sel(this)">3</span>
+        <span class="chip" data-ch="4" onclick="sel(this)">4</span>
+        <span class="chip" data-ch="5" onclick="sel(this)">5</span>
+        <span class="chip" data-ch="6" onclick="sel(this)">6</span>
+        <span class="chip" data-ch="7" onclick="sel(this)">7</span>
+        <span class="chip" data-ch="8" onclick="sel(this)">8</span>
+        <span class="chip" data-ch="9" onclick="sel(this)">9</span>
+        <span class="chip" data-ch="10" onclick="sel(this)">10</span>
+      </div>
+    </div>
+    <select id="foldList"></select>
+    <button onclick="addLink()">保存链接</button>
+  </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const KEY = "dataList";
-let data = JSON.parse(localStorage.getItem(KEY)) || {
-  folders: [{id:1,name:"默认文件夹"}],
-  links:[]
-};
+const SUPABASE_URL = "https://qkrpmoxeqakrwbqndbgg.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrcnBtb3hlcWFrcndicW5kYnFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NTQwNTAsImV4cCI6MjA5MjUzMDA1MH0.U839r7rZSpC6WpzsvGQx-dum0gacakUsBzyaSSs4XVw";
 
-function save(){
-  localStorage.setItem(KEY, JSON.stringify(data));
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let folders = [];
+let selectedChapters = [];
+
+async function load() {
+  const { data: f } = await supabase.from('folders').select('*');
+  folders = f || [];
+  renderFolders();
 }
 
-// 核心：新建文件夹 百分百本地保存
-function addFolder(){
-  let name = document.getElementById("fname").value.trim();
-  if(!name){
-    alert("请输入名称");
-    return;
-  }
-  data.folders.push({
-    id: Date.now(),
-    name: name
-  });
-  save();   // 强制本地保存
-  alert("创建成功！刷新也不会丢！");
-  document.getElementById("fname").value = "";
+function renderFolders() {
+  let s = document.getElementById("foldList");
+  s.innerHTML = folders.map(f => `<option value="${f.id}">${f.name}</option>`).join("");
 }
+
+function sel(el) {
+  el.classList.toggle("selected");
+  let c = el.dataset.ch;
+  selectedChapters.includes(c) ? selectedChapters = selectedChapters.filter(x => x !== c) : selectedChapters.push(c);
+}
+
+async function createFolder() {
+  let name = document.getElementById("foldName").value.trim();
+  if (!name) return alert("请输入文件夹名称");
+  const { data } = await supabase.from('folders').insert([{ name }]).select();
+  folders.push(data[0]);
+  renderFolders();
+  alert("✅ 创建成功！云端永久保存！");
+  document.getElementById("foldName").value = "";
+}
+
+async function addLink() {
+  let name = document.getElementById("title").value.trim();
+  let author = document.getElementById("author").value.trim();
+  let url = document.getElementById("url").value.trim();
+  let fid = Number(document.getElementById("foldList").value);
+  if (!name || !url) return alert("标题和链接不能为空");
+
+  await supabase.from('links').insert([{
+    folder_id: fid,
+    name, author, url,
+    chapters: selectedChapters
+  }]);
+
+  alert("保存成功");
+  location.href = "index.html";
+}
+
+load();
 </script>
-
 </body>
 </html>
