@@ -61,7 +61,7 @@ button{background:var(--btn);color:white;border:none}
 <script>
 const GITHUB_USER = "chaakiira";
 const GITHUB_REPO = "tidyupwork";
-const GITHUB_TOKEN = "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";
+const GITHUB_TOKEN = "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";
 const FILE_PATH = "data.json";
 
 let data;
@@ -113,7 +113,7 @@ async function createFolder() {
     data.folders.push({ id: Date.now(), name: name });
     await save(`创建文件夹：${name}`);
     renderFolder();
-    alert("✅ 创建成功！");
+    alert("✅ 创建成功！刷新不会消失！");
     document.getElementById("folderName").value = "";
   } catch (e) {
     console.error("创建失败:", e);
