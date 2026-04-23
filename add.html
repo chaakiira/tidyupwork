@@ -3,102 +3,139 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>添加链接</title>
+<title>添加内容 | 新建文件夹</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#f2f5f9;--card:#fff;--text:#333;--border:#e3e7ed;--btn:#007bff}
-body{font-family:微软雅黑,sans-serif;background:var(--bg);color:var(--text);padding:12px}
+body{font-family:微软雅黑,sans-serif;background:#f2f5f9;padding:12px}
 .container{max-width:500px;margin:0 auto}
-.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.btn{padding:8px 12px;border-radius:10px;background:var(--btn);color:white;text-decoration:none;font-size:14px}
-.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
-input,select,button{width:100%;padding:12px 14px;border-radius:12px;margin-bottom:10px;font-size:16px;border:1px solid var(--border)}
-button{background:var(--btn);color:white;border:none}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+.btn{padding:8px 12px;background:#007bff;color:#fff;border-radius:10px;text-decoration:none;border:0}
+.card{background:#fff;border-radius:14px;padding:15px;margin-bottom:15px}
+input,select,button{width:100%;padding:12px;border-radius:10px;border:1px solid #ddd;margin:6px 0}
+button{background:#007bff;color:#fff;border:none}
 </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
-    <h1>➕ 添加链接</h1>
-    <a class="btn" href="index.html">← 返回</a>
+    <h2>新建 / 添加</h2>
+    <a class="btn" href="index.html">← 返回网盘</a>
   </div>
+
+  <!-- ============== 你要的【创建文件夹】在这里 ============== -->
   <div class="card">
-    <input type="text" id="folderName" placeholder="输入新文件夹名称">
-    <button onclick="addFolder()">创建文件夹</button>
+    <h4>📁 新建文件夹</h4>
+    <input type="text" id="newFolderName" placeholder="输入文件夹名称">
+    <button onclick="createFolder()">确认创建</button>
   </div>
+
   <div class="card">
-    <input type="text" id="name" placeholder="标题（必填）">
-    <input type="text" id="author" placeholder="作者（选填）">
-    <input type="url" id="url" placeholder="链接地址（必填）">
-    <select id="folder"></select>
-    <button onclick="addLink()">保存并返回</button>
+    <h4>🔗 添加链接</h4>
+    <input type="text" id="linkName" placeholder="标题">
+    <input type="text" id="linkAuthor" placeholder="作者（选填）">
+    <input type="url" id="linkUrl" placeholder="链接地址">
+    <select id="folderSelect"></select>
+    <button onclick="addLink()">保存链接</button>
   </div>
 </div>
 
 <script>
 const GITHUB_USER = "chaakiira";
 const GITHUB_REPO = "tidyupwork";
-const GITHUB_TOKEN = "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";
+// 👉 同样粘贴你的Token
+const GITHUB_TOKEN = "你的Token";
 const FILE_PATH = "data.json";
-let data;
 
-async function load() {
-  try {
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
-    const json = await res.json();
-    data = JSON.parse(decodeURIComponent(escape(atob(json.content))));
-    const sel = document.getElementById("folder");
-    sel.innerHTML = data.folders.map(f => `<option value="${f.id}">${f.name}</option>`).join("");
-  } catch (e) {
-    alert("加载失败：" + e.message);
-  }
+let data = {};
+
+// 读取云端数据
+async function loadData(){
+  const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
+  const json = await res.json();
+  const raw = atob(json.content);
+  data = JSON.parse(decodeURIComponent(escape(raw)));
+  renderFolderSelect();
 }
 
-async function save(message) {
-  const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
-  let sha;
-  if (res.ok) {
-    const json = await res.json();
-    sha = json.sha;
-  }
-  const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
-  const body = { message, content };
-  if (sha) body.sha = sha;
-
-  await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`, {
-    method: "PUT",
-    headers: {
-      "Authorization": `token ${GITHUB_TOKEN}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
+// 刷新文件夹下拉列表
+function renderFolderSelect(){
+  const sel = document.getElementById("folderSelect");
+  sel.innerHTML = "";
+  data.folders.forEach(f=>{
+    sel.innerHTML += `<option value="${f.id}">${f.name}</option>`;
   });
 }
 
-async function addFolder() {
-  const name = document.getElementById("folderName").value.trim();
-  if (!name) return alert("请输入文件夹名称");
-  data.folders.push({ id: Date.now(), name });
-  await save("create folder");
-  document.getElementById("folderName").value = "";
-  await load();
-  alert("创建成功");
+// ========== 重点：创建文件夹函数 ==========
+async function createFolder(){
+  let name = document.getElementById("newFolderName").value.trim();
+  if(!name){
+    alert("请输入文件夹名称");
+    return;
+  }
+  // 生成唯一ID
+  let newId = Date.now();
+  data.folders.push({
+    id: newId,
+    name: name
+  });
+  // 保存到云端
+  await saveData("新建文件夹："+name);
+  document.getElementById("newFolderName").value = "";
+  renderFolderSelect();
+  alert("✅ 文件夹创建成功，所有人同步可见！");
 }
 
-async function addLink() {
-  const name = document.getElementById("name").value.trim();
-  const author = document.getElementById("author").value.trim();
-  const url = document.getElementById("url").value.trim();
-  const fid = Number(document.getElementById("folder").value);
-  if (!name || !url) return alert("标题和链接不能为空");
-  
-  data.links.push({ id: "link-"+Date.now(), name, author, url, fid });
-  await save("add link");
+// 添加链接
+async function addLink(){
+  let name = document.getElementById("linkName").value.trim();
+  let author = document.getElementById("linkAuthor").value.trim();
+  let url = document.getElementById("linkUrl").value.trim();
+  let fid = Number(document.getElementById("folderSelect").value);
+  if(!name || !url){
+    alert("标题和链接不能为空");
+    return;
+  }
+  data.links.push({
+    id: Date.now(),
+    name: name,
+    author: author,
+    url: url,
+    fid: fid
+  });
+  await saveData("添加新链接");
   alert("保存成功");
   location.href = "index.html";
 }
 
-load();
+// 云端保存
+async function saveData(msg){
+  const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`);
+  let sha = "";
+  if(res.ok){
+    let j = await res.json();
+    sha = j.sha;
+  }
+  const str = JSON.stringify(data,null,2);
+  const encodeStr = unescape(encodeURIComponent(str));
+  const content = btoa(encodeStr);
+
+  await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${FILE_PATH}`,{
+    method:"PUT",
+    headers:{
+      "Authorization":"token "+GITHUB_TOKEN,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      message:msg,
+      content:content,
+      sha:sha
+    })
+  });
+}
+
+// 初始化
+loadData();
 </script>
 </body>
 </html>
